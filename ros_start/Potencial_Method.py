@@ -6,7 +6,7 @@ from sensor_msgs.msg import LaserScan
 from tf_transformations import euler_from_quaternion
 import math
 
-class Potential_Method(Node):
+class PotentialNavigator(Node):
     def __init__(self):
         super().__init__("potential_nav_node")
 
@@ -21,10 +21,6 @@ class Potential_Method(Node):
         self.goal_x, self.goal_y = 5.0, -1.0
         self.yaw = 0.0
         self.obstacles = []
-
-        # 速度平滑化
-        self.vx = 0.0
-        self.vy = 0.0
 
         #設定するパラメーターの値　A:引力の強さ　B:斥力の強さ　m:斥力の勾配の変化率
         self.A, self.B, self.m = 0.5, 0.15, 2.0 
@@ -65,17 +61,30 @@ class Potential_Method(Node):
 
                 # デカルト座標に変換後リストに追加
                 sectors[sector_idx].append((x, y))
+        
+        #各セクター内の重心を計算
+        self.obstacles = []
 
         for sector in sectors:
 
-            # 点が5つ以上の領域には障害物があると判断　ノイズ除去のため
             if len(sector) > 5:
 
-                #重心の計算　各点のx座標、y座標の平均で重心を求める
-                sum_x = sum(p[0] for p in sector)
-                sum_y = sum(p[1] for p in sector)
+                # 距離最小の点
+                nearest_point = min(sector,key=lambda p: math.sqrt(p[0]**2 + p[1]**2))
 
-                self.obstacles.append((sum_x / len(sector), sum_y / len(sector)))
+                self.obstacles.append(nearest_point)
+
+
+        # for sector in sectors:
+
+        #     # 点が5つ以上の領域には障害物があると判断　ノイズ除去のため
+        #     if len(sector) > 5:
+
+        #         #重心の計算　各点のx座標、y座標の平均で重心を求める
+        #         sum_x = sum(p[0] for p in sector)
+        #         sum_y = sum(p[1] for p in sector)
+
+        #         self.obstacles.append((sum_x / len(sector), sum_y / len(sector)))
 
     def timer_callback(self):
 
@@ -105,10 +114,8 @@ class Potential_Method(Node):
 
             if 0.1 < do < 2.0:
 
-                # 教科書式
                 force = (self.B * self.m) / (do**(self.m + 1))
 
-                # 正規化
                 f_rep_x -= force * (wx / do)
                 f_rep_y -= force * (wy / do)
 
@@ -132,18 +139,10 @@ class Potential_Method(Node):
             total_x *= (0.5 / norm)
             total_y *= (0.5 / norm)
         
-        # 過去の速度を参照する割合α
-        alpha = 0.6
-
-        # 速度平滑化（急に速度が変化しないように）
-        self.vx = alpha * self.vx + (1 - alpha) * total_x
-        self.vy = alpha * self.vy + (1 - alpha) * total_y
-
         # world座標 → robot座標へ変換
-        cmd_x = self.vx * math.cos(-self.yaw) - self.vy * math.sin(-self.yaw)
-        cmd_y = self.vx * math.sin(-self.yaw) + self.vy * math.cos(-self.yaw)
+        cmd_x = total_x * math.cos(-self.yaw) - total_y * math.sin(-self.yaw)
+        cmd_y = total_x * math.sin(-self.yaw) + total_y * math.cos(-self.yaw)
 
-        
         msg.linear.x = float(cmd_x)
         msg.linear.y = float(cmd_y)
         self.publisher.publish(msg)
@@ -151,7 +150,7 @@ class Potential_Method(Node):
 #main関数
 def main():
     rclpy.init()
-    node = Potential_Method()
+    node = PotentialNavigator()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
