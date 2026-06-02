@@ -23,7 +23,7 @@ class PotentialNavigator(Node):
         self.obstacles = []
 
         #設定するパラメーターの値　A:引力の強さ　B:斥力の強さ　m:斥力の勾配の変化率
-        self.A, self.B, self.m = 0.5, 0.15, 2.0 
+        self.A, self.B, self.m = 0.5, 0.1, 2.0 
 
     def odom_callback(self, msg):
 
@@ -67,24 +67,14 @@ class PotentialNavigator(Node):
 
         for sector in sectors:
 
+            # 点が5つ以上の領域には障害物があると判断　ノイズ除去のため
             if len(sector) > 5:
 
-                # 距離最小の点
-                nearest_point = min(sector,key=lambda p: math.sqrt(p[0]**2 + p[1]**2))
+                #重心の計算　各点のx座標、y座標の平均で重心を求める
+                sum_x = sum(p[0] for p in sector)
+                sum_y = sum(p[1] for p in sector)
 
-                self.obstacles.append(nearest_point)
-
-
-        # for sector in sectors:
-
-        #     # 点が5つ以上の領域には障害物があると判断　ノイズ除去のため
-        #     if len(sector) > 5:
-
-        #         #重心の計算　各点のx座標、y座標の平均で重心を求める
-        #         sum_x = sum(p[0] for p in sector)
-        #         sum_y = sum(p[1] for p in sector)
-
-        #         self.obstacles.append((sum_x / len(sector), sum_y / len(sector)))
+                self.obstacles.append((sum_x / len(sector), sum_y / len(sector)))
 
     def timer_callback(self):
 
